@@ -8,18 +8,30 @@ function spawnCreeps(spawn, desiredCreeps) {
     }
     for (const creepIdx in desiredCreeps) {
         const desiredCreep = desiredCreeps[creepIdx];
+        if (debug) {
+            console.log(`Spawn ${spawn.name}: Role '${desiredCreep.role}'`);
+        }
 
         //Check type is a valid type
         const desiredCreepType = getType(desiredCreep.type);
         if (desiredCreepType) {
+            //Check role spawn condition
+            var conditionPassed = false
+            if (desiredCreep.hasOwnProperty('condition') && desiredCreep.condition.hasOwnProperty('find')) {
+                conditionPassed = spawn.room.find(desiredCreep.condition.find).length > 0;
+            }
+            else {
+                conditionPassed = true;
+            }
+
             //If current creep role quantity is less than the desired quantity
-            if (getCreepsWithRole(desiredCreep.role).length < desiredCreep.quantity) {
+            if (getCreepsWithRole(desiredCreep.role).length < desiredCreep.quantity && conditionPassed) {
                 //If spawn has enough energy to create a creep with role
                 if (spawn.store[RESOURCE_ENERGY] >= calculateCreepRoleSpawnCost(desiredCreepType)) {
                     //Spawn creep with role
                     const creepName = generateCreepName(desiredCreep.role);
                     if (debug) {
-                        console.log(`Spawn ${spawn.name}: Spawning creep '${creepName}' of type ${desiredCreepType.name} with role '${desiredCreep.role}'.`);
+                        console.log(`Spawn ${spawn.name}: INFO Spawning creep '${creepName}' of type '${desiredCreepType.name}' with role '${desiredCreep.role}'.`);
                     }
                     spawn.spawnCreep(desiredCreepType.bodyParts, creepName);
                     const creep = getCreep(creepName);
@@ -40,10 +52,20 @@ function spawnCreeps(spawn, desiredCreeps) {
                 else if (spawn.store.getCapacity(RESOURCE_ENERGY) < calculateCreepRoleSpawnCost(desiredCreepType)) {
                     console.log(`Spawn ${spawn.name}: INFO type '${desiredCreepType.name}' is too expensive for spawn.`)
                 }
+                else if (spawn.store[RESOURCE_ENERGY] < calculateCreepRoleSpawnCost(desiredCreepType)) {
+                    if (debug) {
+                        console.log(`Spawn ${spawn.name}: INFO insufficient energy to spawn creep of type '${desiredCreepType.name}'`)
+                    }
+                }
+            }
+            else if (!conditionPassed) {
+                if (debug) {
+                    console.log(`Spawn ${spawn.name}: INFO Spawn condition not met for role ${desiredCreep.role}, next...`);
+                }
             }
             else {
                 if (debug) {
-                    console.log(`Enough ${desiredCreep.role} creeps, next...`);
+                    console.log(`Spawn ${spawn.name}: INFO Enough ${desiredCreep.role} creeps, next...`);
                 }
             }
         }

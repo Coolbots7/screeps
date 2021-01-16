@@ -13,7 +13,14 @@ const CREEP_TYPES = [
             DEPOSIT_RESOURCE: 'deposit_resource'
         }
     },
-
+    {
+        name: 'builder',
+        bodyParts: [WORK, CARRY, CARRY, MOVE, MOVE],
+        states: {
+            REFUEL: 'refuel',
+            BUILD: 'build'
+        }
+    }
 ];
 
 module.exports = {

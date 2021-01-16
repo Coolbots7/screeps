@@ -10,7 +10,18 @@ function getType(typeName) {
 
 //Takes a role name and generates a unique creep name
 function generateCreepName(roleName) {
-    return roleName + '_' + (getCreepsWithRole(roleName).length + 1).toString();
+    if (Memory.roleIndexes === undefined) {
+        Memory.roleIndexes = {};
+    }
+    var index = Memory.roleIndexes[roleName];
+    if (index === undefined) {
+        index = 1;
+    }
+    else {
+        index += 1;
+    }
+    Memory.roleIndexes[roleName] = index;
+    return roleName + '_' + index.toString();
 }
 
 // ====== Calculate creep role spawn cost ======
@@ -42,6 +53,9 @@ function updateHarvester(creep) {
                 creep.moveTo(Game.getObjectById(creep.memory.target.id));
             }
         }
+        else {
+            creep.memory.target = getNextTarget(creep, creep.memory.task.sources);
+        }
 
         if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity()) {
             //set state to unload
@@ -49,7 +63,7 @@ function updateHarvester(creep) {
             creep.memory.state = type.states.DEPOSIT_RESOURCE;
 
             //use creep task in memory to determine next destination target
-            creep.memory.target = getNextTarget(creep, creep.memory.task.destinations,);
+            creep.memory.target = getNextTarget(creep, creep.memory.task.destinations);
         }
     }
 
@@ -63,6 +77,9 @@ function updateHarvester(creep) {
             else if (transferResult === ERR_FULL) {
                 creep.memory.target = getNextTarget(creep, creep.memory.task.destinations, Game.getObjectById(creep.memory.target.id));
             }
+        }
+        else {
+            creep.memory.target = getNextTarget(creep, creep.memory.task.destinations);
         }
 
         if (creep.store[RESOURCE_ENERGY] <= 0) {
@@ -81,28 +98,86 @@ function updateHarvester(creep) {
 
 }
 
-function getNextTarget(creep, filters, blacklistTarget = undefined) {
-    var targetObjects = [];
+//Builder State Machine
+function updateBuilder(creep) {
+    // console.log(`Updating builder '${harvesterCreeps[creep].name}'`);
 
-    if (filters.find !== undefined) {
-        //For each structure
-        for (const structureIdx in filters.structures) {
-            //Get structures of type and add to possible results list
-            //TODO possibly replace creep.room.find with creep.pos.findInRange to increase efficiency, both are medium CPU cost
-            if (filters.structures === undefined) {
-                targetObjects = creep.room.find(filters.find);
-            }
-            else {
-                targetObjects = creep.room.find(filters.find, { structureType: filters.structures[structureIdx] });                           
-            }
+    const type = creep.memory.type;
 
-            if(targetObjects.length > 0) {
-                break;
+    if (creep.memory.state === null) {
+        creep.memory.state = type.states.REFUEL;
+        creep.memory.target = getNextTarget(creep, creep.memory.task.sources);
+    }
+
+    if (creep.memory.state === type.states.REFUEL) {
+        if (creep.memory.target !== null) {
+            if (creep.harvest(Game.getObjectById(creep.memory.target.id)) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(Game.getObjectById(creep.memory.target.id));
             }
+        }
+        else {
+            creep.memory.target = getNextTarget(creep, creep.memory.task.sources);
+        }
+
+        if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity(RESOURCE_ENERGY)) {
+            creep.memory.state = type.states.BUILD;
+            creep.memory.target = getNextTarget(creep, creep.memory.task.destinations);
         }
     }
 
-    //TODO add id filter
+    if (creep.memory.state === type.states.BUILD) {
+        if (creep.memory.target !== null) {
+            const buildResult = creep.build(Game.getObjectById(creep.memory.target.id));
+            if (buildResult === ERR_NOT_IN_RANGE) {
+                creep.moveTo(Game.getObjectById(creep.memory.target.id));
+            }
+            //If target is now build, get next target
+            if (buildResult === ERR_INVALID_TARGET) {
+                creep.memory.target = getNextTarget(creep, creep.memory.task.destinations, Game.getObjectById(creep.memory.target.id))
+            }
+        }
+        else {
+            creep.memory.target = getNextTarget(creep, creep.memory.task.destinations);
+        }
+
+        if (creep.store[RESOURCE_ENERGY] <= 0) {
+            creep.memory.state = type.states.REFUEL;
+            creep.memory.target = getNextTarget(creep, creep.memory.task.sources);
+        }
+    }
+
+    //TODO what if current source target no longer exists, is surrounded, or is full?
+    //TODO what if current destination target no longer exists, is surrounded, or is now full?
+    //TODO if ticksToLive is below threshold, go to spawn and renew or recycle
+}
+
+//TODO not returning a target when creep is blocked in
+function getNextTarget(creep, filters, blacklistTarget = undefined) {
+    var targetObjects = [];
+
+    //Filter by game object IDs
+    if (filters.ids !== undefined && filters.ids.length > 0) {
+        for (const idx in filters.ids) {
+            targetObjects.push(Game.getObjectById(filters.ids[idx]));
+        }
+    }
+    //Filter by structure
+    else if (filters.find !== undefined) {
+        if (filters.structures === undefined) {
+            targetObjects = creep.room.find(filters.find);
+        }
+        else {
+            //For each structure
+            for (const structureIdx in filters.structures) {
+                //TODO possibly replace creep.room.find with creep.pos.findInRange to increase efficiency, both are medium CPU cost
+                targetObjects = creep.room.find(filters.find, { structureType: filters.structures[structureIdx] });
+
+                if (targetObjects.length > 0) {
+                    break;
+                }
+            }
+        }
+    }
 
     //If at least one result, return closest
     if (targetObjects.length > 0) {
@@ -129,5 +204,5 @@ function getNextTarget(creep, filters, blacklistTarget = undefined) {
 module.exports = {
     getType,
     generateCreepName, calculateCreepRoleSpawnCost,
-    updateHarvester
+    updateHarvester, updateBuilder
 };
