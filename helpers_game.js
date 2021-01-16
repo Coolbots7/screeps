@@ -17,12 +17,16 @@ function getCreep(name) {
     return Game.creeps[name];
 }
 
+function getCreepsWithType(typeName) {
+    return _.filter(Game.creeps, (creep) => creep.memory.type.name == typeName);
+}
+
 //Get creeps with role
 function getCreepsWithRole(roleName) {
-    return _.filter(Game.creeps, (creep) => creep.memory.role.name == roleName);
+    return _.filter(Game.creeps, (creep) => creep.memory.role == roleName);
 }
 
 module.exports = {
     getSpawnNames, getSpawn,
-    getCreepNames, getCreep, getCreepsWithRole
+    getCreepNames, getCreep, getCreepsWithType, getCreepsWithRole
 };

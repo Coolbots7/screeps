@@ -1,13 +1,29 @@
-const { CREEP_ROLE_NAMES } = require("./constants_creeps");
+const { CREEP_TYPE_NAMES } = require("./constants_creeps");
 const { updateHarvester } = require("./helpers_creeps");
-const { getCreepsWithRole, getSpawnNames, getSpawn } = require("./helpers_game");
+const { getCreepsWithType, getSpawnNames, getSpawn } = require("./helpers_game");
 const { spawnCreeps } = require("./helpers_spawns");
 
 //Constant dict of desired creeps. Order determines spawn priority descending
 //Idea; specify condition to be met before spawning. Like game object of type exists for only spawning builders if structures that need building exist
-const DESIRED_CREEPS = {
-    'harvester': 8
-};
+const DESIRED_CREEPS = [
+    {
+        role: 'energy_harvester',
+        type: CREEP_TYPE_NAMES.HARVESTER,
+        quantity: 10,
+        task: {
+            sources: {
+                // ids: ["5fda9c1416bc27839dab2e62", "5fda9c1416bc27839dab2e60"]
+                find: FIND_SOURCES_ACTIVE,
+                structures: [STRUCTURE_POWER_SPAWN]
+            },
+            destinations: {
+                find: FIND_MY_STRUCTURES,
+                structures: [STRUCTURE_SPAWN, STRUCTURE_CONTROLLER]
+            }
+
+        }
+    }
+]
 
 module.exports.loop = function () {
     //Spawns    
@@ -20,7 +36,7 @@ module.exports.loop = function () {
 
     //Creeps
     //Harvesters
-    const harvesterCreeps = getCreepsWithRole(CREEP_ROLE_NAMES.HARVESTER);
+    const harvesterCreeps = getCreepsWithType(CREEP_TYPE_NAMES.HARVESTER);
     for (const creep in harvesterCreeps) {
         updateHarvester(harvesterCreeps[creep]);
     }

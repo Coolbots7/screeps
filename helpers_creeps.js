@@ -1,8 +1,11 @@
-const { CREEP_ROLES } = require("./constants_creeps");
+const { CREEP_TYPES } = require("./constants_creeps");
 const { getCreepsWithRole } = require("./helpers_game");
 
-function getRole(roleName) {
-    return CREEP_ROLES.find(role => role.name === roleName);
+// const TARGET_FILTER_EMPTY = 0x01;
+// const TARGET_FILTER_FULL = 0x02;
+
+function getType(typeName) {
+    return CREEP_TYPES.find(type => type.name === typeName);
 }
 
 //Takes a role name and generates a unique creep name
@@ -21,43 +24,54 @@ function calculateCreepRoleSpawnCost(role) {
 }
 
 // Harvester State Machine
-function updateHarvester(creep) {   
+function updateHarvester(creep) {
     // console.log(`Updating harvester '${harvesterCreeps[creep].name}'`);
 
-    const role = creep.memory.role;
+    const type = creep.memory.type;
 
     if (creep.memory.state === null) {
-        creep.memory.state = role.states.FIND_ENERGY;
-        creep.memory.target = creep.pos.findClosestByPath(FIND_SOURCES);
+        creep.memory.state = type.states.FIND_RESOURCE;
+
+        //use creep task in memory to determine next destination target
+        creep.memory.target = getNextTarget(creep, creep.memory.task.sources);
     }
 
-    if (creep.memory.state === role.states.FIND_ENERGY) {
-        if (creep.harvest(Game.getObjectById(creep.memory.target.id)) == ERR_NOT_IN_RANGE) {
-            creep.moveTo(Game.getObjectById(creep.memory.target.id));
+    if (creep.memory.state === type.states.FIND_RESOURCE) {
+        if (creep.memory.target !== null) {
+            if (creep.harvest(Game.getObjectById(creep.memory.target.id)) === ERR_NOT_IN_RANGE) {
+                creep.moveTo(Game.getObjectById(creep.memory.target.id));
+            }
         }
 
-        if(creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity()) {
+        if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity()) {
             //set state to unload
             //set target to spawn
-            creep.memory.state = role.states.DEPOSIT_ENERGY;
+            creep.memory.state = type.states.DEPOSIT_RESOURCE;
 
-            //TODO remove defined target
-            //TODO check role for target filter or id
-            //Take energy to spawn
-            // creep.memory.target = Game.spawns.Spawn1;
-            //Take energy to controller
-            creep.memory.target = creep.room.controller;
+            //use creep task in memory to determine next destination target
+            creep.memory.target = getNextTarget(creep, creep.memory.task.destinations,);
         }
     }
 
-    if (creep.memory.state === role.states.DEPOSIT_ENERGY) {
-        if(creep.transfer(Game.getObjectById(creep.memory.target.id), RESOURCE_ENERGY) == ERR_NOT_IN_RANGE){
-            creep.moveTo(Game.getObjectById(creep.memory.target.id));
+    if (creep.memory.state === type.states.DEPOSIT_RESOURCE) {
+        if (creep.memory.target !== null) {
+            const transferResult = creep.transfer(Game.getObjectById(creep.memory.target.id), RESOURCE_ENERGY);
+            if (transferResult === ERR_NOT_IN_RANGE) {
+                creep.moveTo(Game.getObjectById(creep.memory.target.id));
+            }
+            //if full get next target
+            else if (transferResult === ERR_FULL) {
+                creep.memory.target = getNextTarget(creep, creep.memory.task.destinations, Game.getObjectById(creep.memory.target.id));
+            }
         }
 
-        if(creep.store[RESOURCE_ENERGY] <= 0) {
-            creep.memory.state = role.states.FIND_ENERGY;
-            creep.memory.target = creep.pos.findClosestByPath(FIND_SOURCES);
+        if (creep.store[RESOURCE_ENERGY] <= 0) {
+            creep.memory.state = type.states.FIND_RESOURCE;
+
+            //use creep task in memory to determine source target
+            creep.memory.target = getNextTarget(creep, creep.memory.task.sources);
+
+            // creep.memory.target = creep.pos.findClosestByPath(FIND_SOURCES);
         }
     }
 
@@ -67,8 +81,53 @@ function updateHarvester(creep) {
 
 }
 
+function getNextTarget(creep, filters, blacklistTarget = undefined) {
+    var targetObjects = [];
+
+    if (filters.find !== undefined) {
+        //For each structure
+        for (const structureIdx in filters.structures) {
+            //Get structures of type and add to possible results list
+            //TODO possibly replace creep.room.find with creep.pos.findInRange to increase efficiency, both are medium CPU cost
+            if (filters.structures === undefined) {
+                targetObjects = creep.room.find(filters.find);
+            }
+            else {
+                targetObjects = creep.room.find(filters.find, { structureType: filters.structures[structureIdx] });                           
+            }
+
+            if(targetObjects.length > 0) {
+                break;
+            }
+        }
+    }
+
+    //TODO add id filter
+
+    //If at least one result, return closest
+    if (targetObjects.length > 0) {
+        if (blacklistTarget !== undefined) {
+            targetObjects = targetObjects.filter((obj) => obj !== blacklistTarget);
+        }
+        return creep.pos.findClosestByPath(targetObjects);
+    }
+
+    return null;
+
+    //TODO filter out result that are full / empty
+    // if (flags & TARGET_FILTER_EMPTY === TARGET_FILTER_EMPTY) {
+    //     //TODO remove empty targets
+    // }
+    // if (flags & TARGET_FILTER_FULL === TARGET_FILTER_FULL) {
+    //     //TODO remove full targets
+    // }
+
+    //TODO filter out results that are surrounded
+    //creep.room.findPath.length <= 0?
+}
+
 module.exports = {
-    getRole,
+    getType,
     generateCreepName, calculateCreepRoleSpawnCost,
     updateHarvester
 };

@@ -1,21 +1,21 @@
-const CREEP_ROLE_NAMES = {
+const CREEP_TYPE_NAMES = {
     HARVESTER: 'harvester',
     BUILDER: 'builder'
 };
 
-const CREEP_ROLES = [
+const CREEP_TYPES = [
     {
         name: 'harvester',
         //Idea: determine body parts based on need and spawn capabilities
         bodyParts: [WORK, CARRY, CARRY, MOVE, MOVE],
         states: {
-            FIND_ENERGY: 'find_energy',
-            DEPOSIT_ENERGY: 'deposit_energy'
+            FIND_RESOURCE: 'find_resource',
+            DEPOSIT_RESOURCE: 'deposit_resource'
         }
     },
 
 ];
 
 module.exports = {
-    CREEP_ROLE_NAMES, CREEP_ROLES
+    CREEP_TYPE_NAMES, CREEP_TYPES
 };
