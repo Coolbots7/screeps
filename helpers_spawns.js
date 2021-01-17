@@ -25,6 +25,7 @@ function spawnCreeps(spawn, desiredCreeps) {
             }
 
             //If current creep role quantity is less than the desired quantity
+                //TODO use extensions in energy check
             if (getCreepsWithRole(desiredCreep.role).length < desiredCreep.quantity && conditionPassed) {
                 //If spawn has enough energy to create a creep with role
                 if (spawn.store[RESOURCE_ENERGY] >= calculateCreepRoleSpawnCost(desiredCreepType)) {
@@ -52,10 +53,13 @@ function spawnCreeps(spawn, desiredCreeps) {
                 else if (spawn.store.getCapacity(RESOURCE_ENERGY) < calculateCreepRoleSpawnCost(desiredCreepType)) {
                     console.log(`Spawn ${spawn.name}: INFO type '${desiredCreepType.name}' is too expensive for spawn.`)
                 }
+                //TODO if ERR_NOT_ENOUGH_ENERGY
                 else if (spawn.store[RESOURCE_ENERGY] < calculateCreepRoleSpawnCost(desiredCreepType)) {
                     if (debug) {
                         console.log(`Spawn ${spawn.name}: INFO insufficient energy to spawn creep of type '${desiredCreepType.name}'`)
                     }
+                    //skip remaining desired creeps in the list due to priority and differing costs
+                    break;
                 }
             }
             else if (!conditionPassed) {

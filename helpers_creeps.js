@@ -75,7 +75,9 @@ function updateHarvester(creep) {
             }
             //if full get next target
             else if (transferResult === ERR_FULL) {
+
                 creep.memory.target = getNextTarget(creep, creep.memory.task.destinations, Game.getObjectById(creep.memory.target.id));
+                //creep.memory.target = null;
             }
         }
         else {
@@ -219,6 +221,10 @@ function updateRepairer(creep) {
             //     creep.memory.target = targets[0];
             // }
             creep.memory.target = creep.pos.findClosestByPath(FIND_STRUCTURES, { filter: object => object.hits < object.hitsMax });
+
+            //TODO work as a builder of not repair targets
+
+            //TODO work as something useful if no repair or build targets
         }
 
         if (creep.store[RESOURCE_ENERGY] <= 0) {
@@ -231,6 +237,87 @@ function updateRepairer(creep) {
     //TODO what if current destination target no longer exists, is surrounded, or is now full?
     //TODO if ticksToLive is below threshold, go to spawn and renew or recycle
 }
+
+
+//TODO transporter
+
+
+
+//Swiffer State Machine
+function updateSwiffer(creep) {
+    // console.log(`Updating swiffer '${harvesterCreeps[creep].name}'`);
+
+    const type = creep.memory.type;
+
+    if (creep.memory.state === null) {
+        creep.memory.state = type.states.PICKUP;
+        creep.memory.target = getNextTarget2(creep, creep.memory.task.sources);
+    }
+
+    //TODO abstract checking if current target still exists
+    if (creep.memory.target !== null && Game.getObjectById(creep.memory.target.id) === null) {
+        creep.memory.target = getNextTarget2(creep, creep.memory.task.sources);
+    }
+
+    if (creep.memory.state === type.states.PICKUP) {
+        if (creep.memory.target !== null) {
+            //If tombstone withdraw, else if resource or debris pickup
+            var pickupResult = creep.pickup(Game.getObjectById(creep.memory.target.id));
+            if(pickupResult === ERR_INVALID_TARGET) {
+                pickupResult = creep.withdraw(Game.getObjectById(creep.memory.target.id));
+            }
+                        
+            if (pickupResult === ERR_NOT_IN_RANGE) {
+                creep.moveTo(Game.getObjectById(creep.memory.target.id));
+            }
+            else if (pickupResult === OK) {
+                creep.memory.target = null;
+            }
+        }
+        else {
+            creep.memory.target = getNextTarget2(creep, creep.memory.task.sources);
+            //No more source targets, dropoff
+            if (creep.memory.target === null && creep.store[RESOURCE_ENERGY] > 0) {
+                //TODO do something else productive when empty and no source targets
+                creep.memory.state = type.states.DROPOFF;
+                creep.memory.target = getNextTarget2(creep, creep.memory.task.destinations);
+            }
+        }
+
+        if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity(RESOURCE_ENERGY)) {
+            creep.memory.state = type.states.DROPOFF;
+            creep.memory.target = getNextTarget2(creep, creep.memory.task.destinations);
+        }
+    }
+
+    if (creep.memory.state === type.states.DROPOFF) {
+        if (creep.memory.target !== null) {
+            const transferResult = creep.transfer(Game.getObjectById(creep.memory.target.id), RESOURCE_ENERGY);
+            // console.log(`transfer: ${transferResult}`)
+            if (transferResult === ERR_NOT_IN_RANGE) {
+                creep.moveTo(Game.getObjectById(creep.memory.target.id));
+            }
+            else if (transferResult == ERR_FULL) {
+                // creep.memory.target = getNextTarget(creep, creep.memory.task.destinations, Game.getObjectById(creep.memory.target.id));
+                creep.memory.target = getNextTarget2(creep, creep.memory.task.destinations);
+            }
+        }
+        else {
+            creep.memory.target = getNextTarget2(creep, creep.memory.task.destinations);
+        }
+
+        if (creep.store[RESOURCE_ENERGY] <= 0) {
+            creep.memory.state = type.states.PICKUP;
+            creep.memory.target = getNextTarget2(creep, creep.memory.task.sources);
+        }
+    }
+
+    //TODO what if current source target no longer exists, is surrounded, or is full?
+    //TODO what if current destination target no longer exists, is surrounded, or is now full?
+    //TODO if ticksToLive is below threshold, go to spawn and renew or recycle
+}
+
+
 
 //TODO not returning a target when creep is blocked in
 function getNextTarget(creep, filters, blacklistTarget = undefined) {
@@ -292,8 +379,78 @@ function getNextTarget(creep, filters, blacklistTarget = undefined) {
     //creep.room.findPath.length <= 0?
 }
 
+
+
+
+function getNextTarget2(creep, filters, blacklistTarget = undefined) {
+    var targetObjects = [];
+
+    //if creep is not in filter room, set target to room
+    // if(filters.room !== undefined && creep.room.name !== filters.room) {
+    //     return creep.pos.findClosestByRange(creep.room.findExitTo(Game.rooms[filters.room]));
+    // }
+
+    for (const filterIdx in filters) {
+        const filter = filters[filterIdx];
+
+        //TODO filter rooms
+
+        //Filter by game object IDs
+        if (filter.ids !== undefined && filter.ids.length > 0) {
+            for (const idx in filter.ids) {
+                targetObjects.push(Game.getObjectById(filter.ids[idx]));
+            }
+        }
+
+        //TODO else filter find
+        //Filter by structure
+        else if (filter.find !== undefined) {
+            //TODO pass filter function
+            // if (filter.filter !== undefined) {
+            //     targetObjects = creep.room.find(filter.find, filter.filter);
+            // }
+            // else
+            if (filter.structures !== undefined) {
+                //For each structure
+                for (const structureIdx in filter.structures) {
+                    //TODO possibly replace creep.room.find with creep.pos.findInRange to increase efficiency, both are medium CPU cost
+                    targetObjects.push(creep.room.find(filter.find, { structureType: filter.structures[structureIdx] }));
+                }
+            }
+            else {
+                targetObjects.push(creep.room.find(filter.find));
+            }
+        }
+
+    }
+
+
+    //If at least one result, return closest
+    if (targetObjects.length > 0) {
+        if (blacklistTarget !== undefined) {
+            targetObjects = targetObjects.filter((obj) => obj !== blacklistTarget);
+        }
+        return creep.pos.findClosestByPath(targetObjects[0]);
+    }
+
+    //TODO if no targets and more than one room specified, try next room
+
+    return null;
+
+    //TODO filter out result that are full / empty
+    // if (flags & TARGET_FILTER_EMPTY === TARGET_FILTER_EMPTY) {
+    //     //TODO remove empty targets
+    // }
+    // if (flags & TARGET_FILTER_FULL === TARGET_FILTER_FULL) {
+    //     //TODO remove full targets
+    // }
+
+    //TODO filter out results that are surrounded
+    //creep.room.findPath.length <= 0?
+}
+
 module.exports = {
     getType,
     generateCreepName, calculateCreepRoleSpawnCost,
-    updateHarvester, updateBuilder, updateRepairer
+    updateHarvester, updateBuilder, updateRepairer, updateSwiffer
 };

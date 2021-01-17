@@ -1,7 +1,8 @@
 const CREEP_TYPE_NAMES = {
     HARVESTER: 'harvester',
     BUILDER: 'builder',
-    REPAIRER: 'repairer'
+    REPAIRER: 'repairer',
+    SWIFFER: 'swiffer'
 };
 
 const CREEP_TYPES = [
@@ -28,6 +29,14 @@ const CREEP_TYPES = [
         states: {
             REFUEL: 'refuel',
             REPAIR: 'repair'
+        }
+    },
+    {
+        name: 'swiffer',
+        bodyParts: [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE],
+        states: {
+            PICKUP: 'pickup',
+            DROPOFF: 'dropoff'
         }
     }
 ];
